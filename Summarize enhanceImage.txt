@@ -1,0 +1,13 @@
+Hãy viết cho tôi một giao diện có kích thước ban đầu là 800x600, kích thước tối đa bằng với kích thước màn hình máy tính của tôi, giao diện sẽ tự thay đổi kích thước khi chiếu ảnh cho vừa.
+Trong giao diện này bao gồm:
+ * Frame chính: có 2 img_label để chiếu ảnh đầu vào và ảnh đầu ra.
+   - input_img_label: để chiếu ảnh đầu vào, ảnh đầu vào được chiếu lên là ảnh nằm ngang thì chiều rộng ảnh phải nhỏ hơn chiều rộng frame chính, chiều cao ảnh phải nhỏ hơn 1 nửa chiều cao của frame chính, đảm bảo điều tương tự nếu ảnh nằm dọc, và label này ở grid (0, 0)
+   - output_img_label: để chiếu ảnh đầu ra, kích thước tương tự ảnh đầu vào, và label nằm ở grid (0, 1) nếu ảnh nằm dọc và (1, 0) nếu ảnh nằm ngang.
+
+ * Frame sidebar: frame để thể hiện 3 giá trị Execute time, PSNR point và SSIM point; frame nơi người dùng có thể nhập các tham số cho hàm Dehaze.run_dehaze; và frame chứa các button: open image, run dehaze, save image.
+   - frame để thể hiện 3 giá trị Execute time, PSNR point và SSIM point. Giá trị mặc định là N/A, thay đổi giá trị tuỳ theo hàm ensure_same_size, calculate_psnr, calculate_ssim của Dehaze.py, và về giá trị mặc định sau khi người dùng mở hình đầu vào mới
+   - frame chứa các input để người dùng có thể thay đổi tham số cho hàm Dehaze.run_dehaze
+   - frame chứa các button thao tác như sau:
+	+ button 'open image': người dùng chọn filepath và mở hình đầu vào bằng Dehaze.open_image. sử dụng hình đó để chiếu lên input_img_label
+	+ button 'run dehaze': chỉ kích hoạt khi đã có hình đầu vào. Chạy các hàm: run_dehaze, ensure_same_size, calculate_psnr, calculate_ssim của Dehaze.py, sau đó chiếu hình đầu ra lên output_img_label, cập nhật giá trị cho Execute time, PSNR point và SSIM point.
+	+ button 'save image': chỉ kích hoạt khi đã có hình đầu ra. Lưu hình đó về máy tính.
