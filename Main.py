@@ -65,9 +65,13 @@ class DehazeApp(tk.Tk):
         self.run_button = tk.Button(self.buttons_frame, text="Run Dehaze", command=self.run_dehaze)
         self.run_button.grid(row=0, column=1, padx=5)
 
+        # export Image Button
+        self.export_button = tk.Button(self.buttons_frame, text="Export Image", command=self.export_image)
+        self.export_button.grid(row=0, column=2, padx=5, pady=5)
+
         # Save Image Button
         self.save_button = tk.Button(self.buttons_frame, text="Save Image", command=self.save_image)
-        self.save_button.grid(row=0, column=2, padx=5)
+        self.save_button.grid(row=1, column=1, padx=5)
 
     def create_parameter_input(self, label_text, default):
         label = tk.Label(self.parameters_frame, text=label_text)
@@ -78,29 +82,46 @@ class DehazeApp(tk.Tk):
         entry.insert(0, str(default))  # Set default value
         return entry
 
+    def resize_image(self, image):
+        buffer = 90
+        sidebar_width = 100
+        max_frame_width = self.winfo_screenwidth() - buffer - sidebar_width
+        max_frame_height = self.winfo_screenheight() - buffer
+        
+        # Resize image
+        return Dehaze.resize_image(image, max_frame_width, max_frame_height)
+
+    def display_image(self, label, image=None):
+        if image is not None:
+            image_rgb = Dehaze.bgr_to_rgb(image)
+            image = ImageTk.PhotoImage(Image.fromarray(image_rgb))
+        else:
+            label.grid_forget()
+        label.config(image=image)
+        label.image = image  # Giữ tham chiếu để tránh bị garbage collected
+
+        self.update_window_size()
+
+    def calc_out_img_label(self):
+        if(self.input_image.shape[0] > self.input_image.shape[1]):
+            self.output_img_label.grid(row=0, column=1)
+        else:
+            self.output_img_label.grid(row=1, column=0)
+
+
     def open_image(self):
         filepath = filedialog.askopenfilename(filetypes=[("Image Files", "*.png;*.jpg;*.jpeg")])
         if filepath:
-            # Get max frame dimensions (half of the main frame size)
-            buffer = 90
-            sidebar_width = 100
-            max_frame_width = self.winfo_screenwidth() - buffer - sidebar_width
-            max_frame_height = self.winfo_screenheight() - buffer
-            print("Max Frame Width:", max_frame_width, "Max Frame Height:", max_frame_height)
-            cv_image = Dehaze.open_image(filepath)
-            # Resize image
-            self.input_image = Dehaze.resize_image(cv_image, max_frame_width, max_frame_height)
-            print(self.input_image.shape)
+            self.input_image_origin = Dehaze.open_image(filepath)
+            self.input_image = self.resize_image(self.input_image_origin)
 
-            input_image_rgb = Dehaze.bgr_to_rgb(self.input_image)
-            input_image_display = ImageTk.PhotoImage(Image.fromarray(input_image_rgb))
-            
-            self.input_img_label.config(image=input_image_display)
-            self.input_img_label.image = input_image_display  # Giữ tham chiếu để tránh bị garbage collected
-            
-            self.output_img_label.config(image=None)  # Clear output image
-            self.update_window_size()
+            if (hasattr(self, "output_image")):
+                self.output_image = None
+                self.display_image(self.output_img_label)
 
+            self.exported_image = None
+
+            self.display_image(self.input_img_label, self.input_image)
             self.clear_metrics()  # Clear metrics
             
     def run_dehaze(self):
@@ -115,23 +136,12 @@ class DehazeApp(tk.Tk):
         }
 
         if hasattr(self, "input_image"):
-            output_image, execution_time = Dehaze.run_dehaze(self.input_image, **parameters)
+            self.output_image, execution_time = Dehaze.run_dehaze(self.input_image, **parameters)
+            self.calc_out_img_label()
+            self.display_image(self.output_img_label, self.output_image)
             
-            self.output_image_bgr = output_image  # Lưu ảnh BGR để có thể lưu lại
-            output_image_rgb = Dehaze.bgr_to_rgb(output_image)  # Chuyển đổi sang RGB để hiển thị
-            output_image_display = ImageTk.PhotoImage(Image.fromarray(output_image_rgb))
-
-            self.output_img_label.config(image=output_image_display)
-            self.output_img_label.image = output_image_display  # Giữ tham chiếu để tránh bị garbage collected
-            if(self.input_image.shape[0] > self.input_image.shape[1]):
-                self.output_img_label.grid(row=0, column=1)
-            else:
-                self.output_img_label.grid(row=1, column=0)
-
-            self.update_window_size()
-
-            psnr = Dehaze.calculate_psnr(self.input_image, output_image)
-            ssim = Dehaze.calculate_ssim(self.input_image, output_image)
+            psnr = Dehaze.calculate_psnr(self.input_image, self.output_image)
+            ssim = Dehaze.calculate_ssim(self.input_image, self.output_image)
 
             self.execute_time_label.config(text=f"Execute Time: {execution_time:.2f} seconds")
             self.psnr_label.config(text=f"PSNR: {psnr:.2f}")
@@ -141,13 +151,20 @@ class DehazeApp(tk.Tk):
             messagebox.showerror("Error", "Please open an image first.")
 
     def save_image(self):
-        if hasattr(self, "output_image_bgr"):
+        if hasattr(self, "exported_image"):
             filepath = filedialog.asksaveasfilename(defaultextension=".png", filetypes=[("PNG files", "*.png")])
             if filepath:
-                Dehaze.save_image(self.output_image_bgr, filepath)
+                Dehaze.save_image(self.output_image, filepath)
                 messagebox.showinfo("Save Image", "Image saved successfully.")
         else:
-            messagebox.showerror("Error", "No image to save.")
+            messagebox.showerror("Error", "Not export image yet.")
+
+    def export_image(self):
+        if hasattr(self, "output_image"):
+            self.exported_image = Dehaze.dehaze(self.input_image_origin)
+            messagebox.showinfo("Export Image", "Image exported successfully.")
+        else:
+            messagebox.showerror("Error", "No image to export.")
 
     def clear_metrics(self):
         self.execute_time_label.config(text="Execute Time: N/A")
